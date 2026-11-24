@@ -1,0 +1,40 @@
+services:
+  hub-data-permissions:
+    image: alpine:3.22
+    user: "0:0"
+    restart: "no"
+    command: ["sh", "-c", "chown -R 65532:65532 /data"]
+    volumes:
+      - open-pos-hub-data:/data
+
+  hub:
+    build:
+      context: .
+      dockerfile: apps/hub/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      POS_HUB_DATABASE: /data/open_pos.sqlite
+      POS_ALLOWED_ORIGINS: ${POS_ALLOWED_ORIGINS:-http://localhost:8081,http://127.0.0.1:8081}
+    volumes:
+      - open-pos-hub-data:/data
+    depends_on:
+      hub-data-permissions:
+        condition: service_completed_successfully
+    expose:
+      - "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  register:
+    build:
+      context: .
+      dockerfile: apps/register/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - hub
+    ports:
+      - "8081:8080"
+
+volumes:
+  open-pos-hub-data:

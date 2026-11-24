@@ -1,0 +1,36 @@
+services:
+  hub:
+    build:
+      context: .
+      dockerfile: apps/hub/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      POS_HUB_DATABASE: /data/open_pos.sqlite
+      POS_ALLOWED_ORIGINS: ${POS_ALLOWED_ORIGINS:?Set the exact HTTPS register origin}
+    volumes:
+      - type: bind
+        source: ${POS_HUB_DATA_DIR:?Set POS_HUB_DATA_DIR to a durable, writable host mount}
+        target: /data
+        bind:
+          create_host_path: false
+    expose:
+      - "8080"
+    networks:
+      - pos-private
+
+  register:
+    build:
+      context: .
+      dockerfile: apps/register/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - hub
+    ports:
+      - "127.0.0.1:${POS_WEB_PORT:-8081}:8080"
+    networks:
+      - pos-private
+
+networks:
+  pos-private:
+    driver: bridge

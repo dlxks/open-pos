@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dart-and-flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/register/package-lock.json
+
+      - name: Check Dart formatting
+        run: >-
+          dart format --output=none --set-exit-if-changed
+          packages/pos_domain/lib packages/pos_domain/test
+          apps/hub/bin apps/hub/lib apps/hub/test
+          apps/register/lib apps/register/test
+
+      - name: Test shared domain
+        working-directory: packages/pos_domain
+        run: dart test
+
+      - name: Test hub and analyze
+        working-directory: apps/hub
+        run: |
+          dart pub get
+          dart test
+          dart analyze
+
+      - name: Test and analyze register
+        working-directory: apps/register
+        run: |
+          flutter pub get
+          flutter test
+          flutter analyze
+          flutter build web --release
+
+      - name: Install browser test dependencies
+        working-directory: apps/register
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Test browser checkout
+        working-directory: apps/register
+        run: npm run test:e2e
+
+  docker-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build self-hosted images
+        run: docker compose build
